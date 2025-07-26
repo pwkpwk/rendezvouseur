@@ -1,4 +1,7 @@
-﻿namespace Rendezvous;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+namespace Rendezvous;
 
 public class FowlerNollVoPickerHash32Bit : IPickerHash
 {
@@ -7,17 +10,18 @@ public class FowlerNollVoPickerHash32Bit : IPickerHash
 
     uint IPickerHash.Calculate(uint seed, ReadOnlySpan<byte> data)
     {
+        ref byte bp = ref MemoryMarshal.GetReference(data);
+            
         // 32-bit FNV-1a hashing algorithm
         // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
         uint hash = OffsetBasis;
-            
-        foreach (byte c in data)
+
+        for (int i = 0; i < data.Length; ++i)
         {
-            hash ^= c;
-            hash *= FnvPrime;
+            hash = (hash ^ bp) * FnvPrime;
+            bp = ref Unsafe.Add(ref bp, 1);
         }
             
-        hash ^= seed;
-        return hash * FnvPrime;
+        return (hash ^ seed) * FnvPrime;
     }
 }
