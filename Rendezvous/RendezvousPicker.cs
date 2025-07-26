@@ -9,30 +9,60 @@ public class RendezvousPicker<TKey>(
 {
     private readonly IEqualityComparer<TKey> _keyEquality = keyEquality ?? EqualityComparer<TKey>.Default;
     
-    public ReadOnlySpan<char> Pick(ReadOnlySpan<char> commaSeparatedList, TKey key)
+    public ReadOnlySpan<char> Pick(ReadOnlySpan<char> tokens, TKey key)
     {
-        ReadOnlySpan<char> pickedToken = commaSeparatedList;
+        ReadOnlySpan<char> pickedToken = tokens;
         uint pickedHash = uint.MaxValue;
+        bool picked = false;
         
-        foreach (var token in commaSeparatedList.Tokenize(','))
+        foreach (var token in tokens.Tokenize(','))
         {
             var trimmedToken = token.Trim();
-            uint hash = CalculateHash(trimmedToken);
-            if (hash <= pickedHash)
+
+            if (trimmedToken.Length != 0)
             {
-                pickedHash = hash;
-                pickedToken = trimmedToken;
+                uint hash = CalculateHash(trimmedToken, key);
+                if (!picked || hash < pickedHash)
+                {
+                    picked = true;
+                    pickedHash = hash;
+                    pickedToken = trimmedToken;
+                }
             }
         }
         
-        return pickedToken;
+        return picked ? pickedToken : throw new ArgumentException("No tokens in the CSV",  nameof(tokens));
+    }
 
-        uint CalculateHash(ReadOnlySpan<char> token)
+    string IRendezvousPicker<TKey>.Pick(string[] names, TKey key)
+    {
+        if (names.Length == 1)
         {
-            Span<byte> buffer = stackalloc byte[token.Length * sizeof(uint)];
-            int length = Encoding.UTF8.GetBytes(token, buffer);
-            
-            return hashCalculator.Calculate((uint)_keyEquality.GetHashCode(key!), buffer.Slice(0, length));
+            return names[0];
         }
+        
+        string? pickedName = null;
+        uint pickedHash = uint.MaxValue;
+
+        foreach (string name in names)
+        {
+            uint hash = CalculateHash(name.AsSpan(), key);
+
+            if (pickedName is null || hash < pickedHash)
+            {
+                pickedName = name;
+                pickedHash = hash;
+            }
+        }
+
+        return pickedName ?? throw new ArgumentException("Sequence cannot be empty", nameof(names));
+    }
+
+    private uint CalculateHash(ReadOnlySpan<char> token, TKey key)
+    {
+        Span<byte> buffer = stackalloc byte[token.Length * sizeof(uint)];
+        int length = Encoding.UTF8.GetBytes(token, buffer);
+            
+        return hashCalculator.Calculate((uint)_keyEquality.GetHashCode(key!), buffer.Slice(0, length));
     }
 }
