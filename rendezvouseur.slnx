@@ -1,0 +1,4 @@
+﻿<Solution>
+  <Project Path="rendezvous-main\rendezvous-main.csproj" Type="Classic C#" />
+  <Project Path="Rendezvous\Rendezvous.csproj" Type="Classic C#" />
+</Solution>
