@@ -2,23 +2,22 @@
 
 public class FowlerNollVoPickerHash32Bit : IPickerHash
 {
-    private const int FnvPrime = 16777619;
-    private const int OffsetBasis = unchecked((int)2166136261);
+    private const uint FnvPrime = 16777619;
+    private const uint OffsetBasis = 2166136261;
 
-    int IPickerHash.CalculateHash(int keyHash, ReadOnlySpan<char> token)
+    uint IPickerHash.Calculate(uint seed, ReadOnlySpan<byte> data)
     {
         // 32-bit FNV-1a hashing algorithm
         // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
-        int hash = OffsetBasis;
-        var trimmedToken = token.Trim();
+        uint hash = OffsetBasis;
             
-        foreach (char c in trimmedToken)
+        foreach (byte c in data)
         {
             hash ^= c;
             hash *= FnvPrime;
         }
             
-        hash ^= keyHash;
+        hash ^= seed;
         return hash * FnvPrime;
     }
 }

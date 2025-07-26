@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.HighPerformance;
+﻿using System.Text;
+using CommunityToolkit.HighPerformance;
 
 namespace Rendezvous;
 
@@ -11,13 +12,13 @@ public class RendezvousPicker<TKey>(
     public ReadOnlySpan<char> Pick(ReadOnlySpan<char> commaSeparatedList, TKey key)
     {
         ReadOnlySpan<char> pickedToken = commaSeparatedList;
-        int pickedHash = int.MaxValue;
+        uint pickedHash = uint.MaxValue;
         
         foreach (var token in commaSeparatedList.Tokenize(','))
         {
             var trimmedToken = token.Trim();
-            int hash = hashCalculator.CalculateHash(_keyEquality.GetHashCode(key!), trimmedToken);
-            if (hash < pickedHash)
+            uint hash = CalculateHash(trimmedToken);
+            if (hash <= pickedHash)
             {
                 pickedHash = hash;
                 pickedToken = trimmedToken;
@@ -25,5 +26,13 @@ public class RendezvousPicker<TKey>(
         }
         
         return pickedToken;
+
+        uint CalculateHash(ReadOnlySpan<char> token)
+        {
+            Span<byte> buffer = stackalloc byte[token.Length * sizeof(uint)];
+            int length = Encoding.UTF8.GetBytes(token, buffer);
+            
+            return hashCalculator.Calculate((uint)_keyEquality.GetHashCode(key!), buffer.Slice(0, length));
+        }
     }
 }

@@ -2,5 +2,5 @@
 
 public interface IPickerHash
 {
-    int CalculateHash(int keyHash, ReadOnlySpan<char> token);
+    uint Calculate(uint seed, ReadOnlySpan<byte> data);
 }

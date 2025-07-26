@@ -1,27 +1,50 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using CommunityToolkit.HighPerformance;
 using Rendezvous;
 
-Console.WriteLine("Hello, World!");
+const long rangeStart = 1;
+const long rangeEnd = 5_000_000;
+const string csv = "one, two, three, four, five, six, seven, eight, nine";
 
-IRendezvousPicker<long> picker = new RendezvousPicker<long>(new FowlerNollVoPickerHash32Bit());
-Dictionary<string, int> stats = new(11);
+Analyze<MurMurHash32Bit>(csv, rangeStart, rangeEnd);
+Analyze<FowlerNollVoPickerHash32Bit>(csv, rangeStart, rangeEnd);
 
-for (long key = 1; key < 20000; key++)
+return;
+
+static IDictionary<string, int> Distribute(IRendezvousPicker<long> picker, string csv, long start, long end)
 {
-    var picked = picker.Pick("cluster-a, cluster-b, cluster-c, cluster-d, cluster-e ", key).ToString();
+    Dictionary<string, int> distribution = new(11);
+    
+    for (long key = start; key <= end; key++)
+    {
+        var picked = picker.Pick(csv, key).ToString();
 
-    if (stats.TryGetValue(picked, out int count))
-    {
-        stats[picked] = count + 1;
+        if (distribution.TryGetValue(picked, out int count))
+        {
+            distribution[picked] = count + 1;
+        }
+        else
+        {
+            distribution[picked] = 1;
+        }
     }
-    else
-    {
-        stats[picked] = 1;
-    }
+    
+    return distribution;
 }
 
-foreach (var pair in stats)
+static void Analyze<THash>(string csv, long start, long end) where THash : IPickerHash, new()
 {
-    Console.WriteLine(pair.Key + ": " + pair.Value);
+    int count = 0;
+    foreach (var token in csv.Tokenize(',')) ++count;
+    var distribution = Distribute(new RendezvousPicker<long>(new THash()), csv, start, end);
+
+    double mean = (double)(end - start) / count;
+    double sum = 0;
+    foreach (var pair in distribution)
+        sum += Math.Pow(mean - pair.Value, 2);
+    double adjusted = Math.Sqrt(sum / count) * 100 / mean;
+    double fill = (double)distribution.Count * 100 / count;
+    
+    Console.WriteLine($"{typeof(THash).Name} | deviation = {adjusted:F2}%, fill = {fill:F1}%");
 }
