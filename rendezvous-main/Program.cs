@@ -1,5 +1,8 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using System.Buffers;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using CommunityToolkit.HighPerformance;
 using Rendezvous;
 
@@ -12,6 +15,8 @@ string[] seq = ["one", "two", "three",  "four", "five", "six", "seven", "eight",
 // Analyze<MurMurHash32Bit>(csv, rangeStart, rangeEnd);
 // Analyze<FowlerNollVoPickerHash32Bit>(csv, rangeStart, rangeEnd);
 // Analyze<PolynomialRollingHash32Bit>(csv, rangeStart, rangeEnd);
+
+Console.WriteLine(Pack([-5, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 14, 15, 28, 29]));
 
 AnalyzeSequence<MurMurHash32Bit>(seq, rangeStart, rangeEnd);
 AnalyzeSequence<FowlerNollVoPickerHash32Bit>(seq, rangeStart, rangeEnd);
@@ -90,4 +95,46 @@ static void AnalyzeSequence<THash>(string[] names, long start, long end) where T
         DistributeSequence(new RendezvousPicker<long>(new THash()), names, start, end),
         end - start,
         names.Length);
+}
+
+static string Pack(int[] numbers)
+{
+    ref int np = ref MemoryMarshal.GetReference(numbers.AsSpan());
+    ref int e = ref np;
+
+    int min = np;
+    int max = min;
+
+    for (int i = 1; i < numbers.Length; ++i)
+    {
+        e = ref Unsafe.Add(ref e, 1);
+        
+        if (e < min) min = e;
+        else if (e > max) max = e;
+    }
+
+    int distance = max - min;
+    int byteLength = distance / 8 + 1;
+    byte[] output = ArrayPool<byte>.Shared.Rent(byteLength);
+
+    try
+    {
+        var outputSpan = output.AsSpan().Slice(0, byteLength); 
+        ref byte bp = ref MemoryMarshal.GetReference(outputSpan);
+
+        for (int i = 0; i < numbers.Length; ++i)
+        {
+            int bitIndex = np - min;
+            ref byte b = ref Unsafe.Add(ref bp, bitIndex / 8);
+            b |= (byte)(1 << (bitIndex % 8));
+        
+            np = ref Unsafe.Add(ref np, 1);
+        }
+    
+        return Convert.ToBase64String(outputSpan);
+    }
+    finally
+    {
+        ArrayPool<byte>.Shared.Return(output);
+    }
 }
